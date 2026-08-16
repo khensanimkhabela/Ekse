@@ -114,11 +114,15 @@ export type Wallet = {
 
 export type WalletResult =
   | { wallet: Wallet; status: "ok" }
-  | { wallet: null; status: "not-artist" | "error" };
+  | { wallet: null; status: "not-artist" | "error" | "unauthorized" };
 
 /** Calls backend/routers/wallet.py — real payments ledger + a live AI Tax
  * Assistant estimate, requires the caller's JWT. 404 means the signed-in
- * user has no artist profile (organizer accounts don't have a wallet). */
+ * user has no artist profile (organizer accounts don't have a wallet).
+ * 401 means the saved session no longer matches a real user — e.g. the
+ * demo DB was rebuilt (fresh random user ids) since this browser logged
+ * in — the caller should clear the session and send them back to /login,
+ * not just show a generic error. */
 export async function getWallet(token: string): Promise<WalletResult> {
   try {
     const res = await fetch(`${API_URL}/wallet`, {
@@ -126,6 +130,7 @@ export async function getWallet(token: string): Promise<WalletResult> {
       cache: "no-store",
     });
     if (res.status === 404) return { wallet: null, status: "not-artist" };
+    if (res.status === 401) return { wallet: null, status: "unauthorized" };
     if (!res.ok) return { wallet: null, status: "error" };
     return { wallet: await res.json(), status: "ok" };
   } catch {

@@ -21,7 +21,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # frontend dev origin
+    # Both hostnames the frontend dev server answers on — the browser treats
+    # localhost and 127.0.0.1 as different origins even though they're the
+    # same machine, so a client-side fetch (e.g. the Wallet page, which
+    # needs the caller's JWT) silently fails CORS if only one is allowed.
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

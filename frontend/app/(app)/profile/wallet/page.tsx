@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BackArrowIcon, EditIcon, TargetIcon } from "@/components/icons";
-import { getToken, getStoredUser, type AuthUser } from "@/lib/auth";
+import { clearSession, getToken, getStoredUser, type AuthUser } from "@/lib/auth";
 import { getWallet, type Wallet } from "@/lib/api";
 import { getRevenueGoal, setRevenueGoal } from "@/lib/walletGoal";
 
@@ -18,20 +18,6 @@ function formatDate(dateStr: string): string {
     : parsed.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function daysUntil(dateStr: string): number | null {
-  const parsed = new Date(`${dateStr.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return Math.ceil((parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  released: "bg-green-100 text-green-700",
-  held_in_escrow: "bg-amber-100 text-amber-700",
-  pending: "bg-amber-100 text-amber-700",
-  refunded: "bg-red-100 text-red-600",
-  failed: "bg-red-100 text-red-600",
-};
-
 const STATUS_LABELS: Record<string, string> = {
   released: "Paid out",
   held_in_escrow: "In escrow",
@@ -40,12 +26,22 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "Failed",
 };
 
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-surface rounded-card p-4 shadow-sm">
+      <p className="text-textBody/60 text-xs font-heading font-semibold">{label}</p>
+      <p className="text-textBody text-xl font-heading font-extrabold mt-0.5">{value}</p>
+    </div>
+  );
+}
+
 /**
- * Wallet — an artist's earnings dashboard: real payments-ledger totals
- * (backend/routers/wallet.py) plus a live AI Tax Assistant estimate fed
- * by those real earnings, and a personal revenue goal (see
- * lib/walletGoal.ts — a preference, not backend data). No reference
- * screen for this exists in /design-reference.
+ * Wallet — a simple artist earnings summary: real payments-ledger totals
+ * (backend/routers/wallet.py) plus a live AI Tax Assistant estimate, and a
+ * personal revenue goal (lib/walletGoal.ts — a preference, not backend
+ * data). Kept deliberately plain: one stat grid, one progress bar, one
+ * transaction list — no reference screen for this exists in
+ * /design-reference.
  */
 export default function WalletPage() {
   const router = useRouter();
@@ -72,10 +68,18 @@ export default function WalletPage() {
       return;
     }
     getWallet(token).then((result) => {
+      if (result.status === "unauthorized") {
+        // Saved session no longer matches a real user (e.g. the demo DB
+        // was rebuilt since this browser logged in) — send them to sign
+        // in again instead of leaving a dead "couldn't load" screen.
+        clearSession();
+        router.push("/login");
+        return;
+      }
       setStatus(result.status);
       if (result.wallet) setWallet(result.wallet);
     });
-  }, []);
+  }, [router]);
 
   function saveGoal() {
     if (!user) return;
@@ -86,9 +90,7 @@ export default function WalletPage() {
     setEditingGoal(false);
   }
 
-  const earnedPct = wallet ? Math.min(100, (wallet.earned_zar / goal) * 100) : 0;
-  const totalPct = wallet ? Math.min(100, (wallet.total_revenue_zar / goal) * 100) : 0;
-  const filingDays = wallet ? daysUntil(wallet.sars_filing_due) : null;
+  const goalPct = wallet ? Math.min(100, Math.round((wallet.earned_zar / goal) * 100)) : 0;
 
   return (
     <main>
@@ -113,27 +115,15 @@ export default function WalletPage() {
           <p className="text-textHeading font-heading font-medium bg-white/40 rounded-tile px-4 py-6 text-center">Loading…</p>
         ) : (
           <>
-            {/* Total revenue hero */}
-            <div className="bg-primary rounded-card px-5 py-5 shadow-sm">
-              <p className="text-white/80 text-sm font-heading font-semibold">Total Revenue</p>
-              <p className="text-white text-3xl font-heading font-extrabold mt-1">{formatZar(wallet.total_revenue_zar)}</p>
-              <div className="flex gap-4 mt-3">
-                <div>
-                  <p className="text-white/70 text-xs">Earned</p>
-                  <p className="text-white font-heading font-bold">{formatZar(wallet.earned_zar)}</p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-xs">Pending</p>
-                  <p className="text-white font-heading font-bold">{formatZar(wallet.pending_zar)}</p>
-                </div>
-                <div>
-                  <p className="text-white/70 text-xs">Completed gigs</p>
-                  <p className="text-white font-heading font-bold">{wallet.completed_bookings}</p>
-                </div>
-              </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Total Revenue" value={formatZar(wallet.total_revenue_zar)} />
+              <StatCard label="Earned" value={formatZar(wallet.earned_zar)} />
+              <StatCard label="Pending" value={formatZar(wallet.pending_zar)} />
+              <StatCard label="Due to SARS" value={formatZar(wallet.estimated_tax_zar)} />
             </div>
 
-            {/* Revenue goal */}
+            {/* Goal */}
             <div className="bg-surface rounded-card p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -172,33 +162,13 @@ export default function WalletPage() {
               ) : (
                 <>
                   <p className="text-sm text-textBody/80 mb-2">
-                    {formatZar(wallet.earned_zar)} of {formatZar(goal)} goal ({Math.round(earnedPct)}%)
+                    {formatZar(wallet.earned_zar)} of {formatZar(goal)} ({goalPct}%)
                   </p>
-                  <div className="relative h-3 bg-inputFill rounded-pill overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-primary/30 rounded-pill" style={{ width: `${totalPct}%` }} />
-                    <div className="absolute inset-y-0 left-0 bg-primary rounded-pill" style={{ width: `${earnedPct}%` }} />
+                  <div className="h-3 bg-inputFill rounded-pill overflow-hidden">
+                    <div className="h-full bg-primary rounded-pill" style={{ width: `${goalPct}%` }} />
                   </div>
-                  {wallet.pending_zar > 0 ? (
-                    <p className="text-xs text-textBody/60 mt-1.5">
-                      + {formatZar(wallet.pending_zar)} pending would put you at {Math.round(totalPct)}%
-                    </p>
-                  ) : null}
                 </>
               )}
-            </div>
-
-            {/* SARS / tax */}
-            <div className="bg-surface rounded-card p-4 shadow-sm">
-              <p className="font-heading font-bold text-textBody mb-2">Due to SARS</p>
-              <p className="text-2xl font-heading font-extrabold text-textBody">{formatZar(wallet.estimated_tax_zar)}</p>
-              <p className="text-xs text-textBody/60 mt-1">
-                Estimated on {formatZar(wallet.taxable_income_zar)} taxable income · {wallet.effective_tax_rate_pct}% effective rate
-              </p>
-              <p className="text-sm text-textBody/80 mt-2">
-                Filing due {formatDate(wallet.sars_filing_due)}
-                {filingDays != null ? ` · ${filingDays >= 0 ? `${filingDays} days left` : "overdue"}` : ""}
-              </p>
-              <p className="text-[11px] text-textBody/50 mt-2">Estimated by Fimiya&apos;s AI Tax Assistant — not filed tax advice.</p>
             </div>
 
             {/* Recent transactions */}
@@ -206,22 +176,19 @@ export default function WalletPage() {
               <p className="font-heading font-bold text-xl text-textHeading mb-3">Recent Transactions</p>
               {wallet.transactions.length === 0 ? (
                 <p className="text-textHeading font-heading font-medium bg-white/40 rounded-tile px-4 py-6 text-center">
-                  No transactions yet — booked gigs will show up here.
+                  No transactions yet.
                 </p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   {wallet.transactions.map((t) => (
-                    <div key={t.id} className="bg-surface rounded-card p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                    <div key={t.id} className="bg-surface rounded-card p-3 flex items-center justify-between gap-3 shadow-sm">
                       <div className="min-w-0">
                         <p className="font-heading font-bold text-sm text-textBody truncate">{t.event_title}</p>
-                        <p className="text-xs text-textBody/60">{formatDate(t.date)}</p>
+                        <p className="text-xs text-textBody/60">
+                          {formatDate(t.date)} · {STATUS_LABELS[t.status] ?? t.status}
+                        </p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-heading font-bold text-textBody">{formatZar(t.amount_zar)}</p>
-                        <span className={`text-[11px] font-heading font-bold rounded-pill px-2 py-0.5 ${STATUS_STYLES[t.status] ?? ""}`}>
-                          {STATUS_LABELS[t.status] ?? t.status}
-                        </span>
-                      </div>
+                      <p className="font-heading font-bold text-textBody shrink-0">{formatZar(t.amount_zar)}</p>
                     </div>
                   ))}
                 </div>
