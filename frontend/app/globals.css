@@ -1,0 +1,67 @@
+@import "./design-tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    padding: 0;
+    margin: 0;
+    font-family: var(--font-body);
+    background-color: #f4f4f4;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* App "phone frame" shell — the reference screens are a mobile app; centered
+   on wider viewports so desktop review still reads correctly. */
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  background-color: var(--color-bg-lime, #8bf65d);
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Stories row — continuous slideshow. The track renders the story list
+   twice back-to-back and animates exactly one copy-width to the left, so
+   the loop is seamless; hovering the row pauses it so a zoomed thumbnail
+   doesn't slide away mid-look (see components/StoriesRow.tsx). */
+@keyframes stories-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.stories-track {
+  animation: stories-slide 32s linear infinite;
+}
+
+.stories-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stories-track {
+    animation: none;
+  }
+}

@@ -1,0 +1,60 @@
+# Fimiya (Ekse — Shine Yakithi) — local multi-service stack.
+#
+# By default `backend` and `ai-services` run against the committed SQLite
+# demo DB (backend/db/fimiya_demo.db) — zero-config, matches
+# BUILD INSTRUCTIONS #2. `postgres` and `redis` are provisioned here to
+# match the production TECH STACK target; switch backend's DATABASE_URL
+# (see .env.example) to point at `postgres` once you're ready to run
+# against it — schema.sql is auto-applied on first boot via the
+# docker-entrypoint-initdb.d mount below.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fimiya}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fimiya_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-fimiya}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../backend/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fimiya}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  ai-services:
+    build: ../ai-services
+    ports:
+      - "8001:8001"
+
+  backend:
+    build: ../backend
+    environment:
+      AI_SERVICES_URL: http://ai-services:8001
+      DATABASE_URL: ${DATABASE_URL:-}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-insecure-secret-change-me}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ai-services
+
+  frontend:
+    build: ../frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

@@ -1,0 +1,43 @@
+/* Ekse — Shine Yakithi (Fimiya) — Design Tokens
+   Sampled directly from the reference UI screenshots in /design-reference. */
+
+:root {
+  /* Brand colors */
+  --color-primary: #5271FF;      /* header banners, primary buttons/pills, icon tiles, nav bar, links */
+  --color-brand-green: #73EF59;  /* logo mark background, login/auth screen background */
+  --color-bg-lime: #8BF65D;      /* in-app screen background (behind header, on list/browse screens) */
+  --color-surface: #FFFFFF;      /* cards, search bar fill, post content panel, button label text */
+  --color-input-fill: #E6E1E1;   /* form input backgrounds (login fields) */
+
+  /* Text */
+  --color-text-on-primary: #FFFFFF; /* text/labels on blue buttons */
+  --color-text-heading: #5271FF;    /* section titles on green backgrounds */
+  --color-text-body: #111111;       /* post captions / body copy on white cards */
+  --color-text-placeholder: #8A8888;/* input placeholder text */
+
+  /* Shape */
+  --radius-pill: 28px;   /* list buttons, search bar, login button */
+  --radius-card: 24px;   /* cards, header bottom edge, bottom nav top edge */
+  --radius-tile: 16px;   /* category/section icon tiles */
+
+  /* Typography */
+  --font-heading: 'Poppins', 'Baloo 2', 'Nunito', sans-serif; /* bold, rounded, geometric */
+  --font-body: 'Poppins', 'Nunito', sans-serif;
+  --font-weight-heading: 700;
+  --font-weight-body: 400;
+}
+
+/* Example Tailwind theme.extend equivalent:
+colors: {
+  primary: '#5271FF',
+  brandGreen: '#73EF59',
+  bgLime: '#8BF65D',
+  surface: '#FFFFFF',
+  inputFill: '#E6E1E1',
+},
+borderRadius: {
+  pill: '28px',
+  card: '24px',
+  tile: '16px',
+},
+*/
