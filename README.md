@@ -1,4 +1,4 @@
-# Fimiya — Ekse, Shine Yakithi.
+# Ekse, Shine Yakithi.
 
 **An AI-powered creative economy platform for South African artists.**
 
